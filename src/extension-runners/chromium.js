@@ -57,7 +57,11 @@ export class ChromiumExtensionRunner {
 
   async run() {
     // Run should never be called more than once.
-    this._promiseSetupDone = this.setupInstance();
+    this._promiseSetupDone = this.setupInstance().catch(async (err) => {
+      // ensure exit cleanup tasks run
+      await this.exit();
+      throw err;
+    });
     await this._promiseSetupDone;
   }
 
@@ -264,7 +268,7 @@ export class ChromiumExtensionRunner {
   async createReloadManagerExtension() {
     const tmpDir = new TempDir();
     await tmpDir.create();
-    this.registerCleanup(() => tmpDir.remove());
+    this.registerCleanup(async () => await tmpDir.remove());
 
     const extPath = path.join(
       tmpDir.path(),
@@ -408,7 +412,7 @@ export class ChromiumExtensionRunner {
     // Call all the registered cleanup callbacks.
     for (const fn of this.cleanupCallbacks) {
       try {
-        fn();
+        await fn();
       } catch (error) {
         log.error(error);
       }
